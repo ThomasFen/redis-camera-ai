@@ -3,6 +3,7 @@ import sys
 import cv2
 import redis
 import urllib.parse
+import time
 
 '''
 Capture frames from Camera and save to Redis Streams
@@ -16,11 +17,11 @@ if __name__ == '__main__':
     parser.add_argument('-u', '--url', help='Redis URL',
                         type=str, default='redis://localhost:6379')
     parser.add_argument(
-        '-o', '--output', help='Output stream key name', type=str, default='camera:0')
+        '-o', '--output', help='Output stream key name', type=str, default='main')
     parser.add_argument('--fmt', help='Frame storage format',
                         type=str, default='.jpg')
     parser.add_argument(
-        '--fps', help='Frames per second (webcam)', type=float, default=1.0)
+        '--fps', help='Frames per second (webcam)', type=float, default=10.0)
     parser.add_argument(
         '--maxlen', help='Maximum length of output stream', type=int, default=1000)
     parser.add_argument(
@@ -48,33 +49,44 @@ if __name__ == '__main__':
         raise Exception('Could not open video device')
 
     '''
-    Set camera resolution and FPS
+    Set camera resolution and FPS (no effect when camera is not supporting it.)
     '''
-    cap.set(cv2.CAP_PROP_FPS, args.fps)
+    # cap.set(cv2.CAP_PROP_FPS, args.fps)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
 
     '''
-    Capture frames
+    Capture frames setting fps here because my camera didn't suppport changing capture fps)
     '''
+    frame_rate = args.fps
+    prev = 0
+
     while(True):
         try:
-            ret, frame = cap.read()
+            time_elapsed = time.time() - prev
 
-            '''
-            Rotate 90 degree clockwise if required
-            '''
-            if args.rotate_90_clockwise:
-                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+            if time_elapsed > 1./frame_rate:
+                prev = time.time()
 
-            '''
-            Encode and add frame to Redis Stream
-            '''
-            _, data = cv2.imencode(args.fmt, frame)
-            img = data.tobytes()
-            id = conn.execute_command(
-                'xadd', args.output, 'MAXLEN', '~', args.maxlen, '*', 'img', img)
-            print('id: {}, size: {}'.format(id, len(img)))
+                ret, frame = cap.read()
+
+                '''
+                Rotate 90 degree clockwise if required
+                '''
+                if args.rotate_90_clockwise:
+                    frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+
+                '''
+                Encode and add frame to Redis Stream
+                '''
+                _, data = cv2.imencode(args.fmt, frame)
+                img = data.tobytes()
+                id = conn.execute_command(
+                    'xadd', args.output, 'MAXLEN', '~', args.maxlen, '*', 'img', img, 'userId', 99999, 'conferenceId', 99999)
+                print('id: {}, size: {}'.format(id, len(img)))
+
+
+
 
         except:
             print('Releasing the capture and exiting...')
