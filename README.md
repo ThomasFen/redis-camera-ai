@@ -21,3 +21,4 @@ cat gears-emotion.py | redis-cli -x RG.PYEXECUTE
 cd camera/
 python3 edge-camera.py -u redis://redis:6379
 ```
+4. [Visit the dashboard](http://localhost:3000/d/DtsbVE3Mk/camera-processing?orgId=1) (Click refresh in the upper right corner to see frame latency updates)
